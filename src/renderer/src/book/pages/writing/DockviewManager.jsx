@@ -1,0 +1,191 @@
+import { useRef, useImperativeHandle, forwardRef } from 'react';
+import { DockviewReact } from 'dockview-react';
+import 'dockview-react/dist/styles/dockview.css';
+import {
+  Book,
+  Folder,
+  FileText,
+  X,
+  User,
+  Globe,
+  MapPin,
+  Package,
+} from 'lucide-react';
+
+const CustomTab = ({ api, params }) => {
+  const getIcon = (type) => {
+    const typeToCheck = params?.iconType || params?.component;
+
+    switch (typeToCheck) {
+      case 'chapters':
+        return <Book className="h-3 w-3 mr-1" />;
+      case 'scenes':
+        return <Folder className="h-3 w-3 mr-1" />;
+      case 'scene-editor':
+        return <FileText className="h-3 w-3 mr-1" />;
+      case 'character-editor':
+        return <User className="h-3 w-3 mr-1" />;
+      case 'world-editor':
+        return <Globe className="h-3 w-3 mr-1" />;
+      case 'location-editor':
+        return <MapPin className="h-3 w-3 mr-1" />;
+      case 'object-editor':
+        return <Package className="h-3 w-3 mr-1" />;
+      default:
+        return null;
+    }
+  };
+
+  const onClose = (e) => {
+    e.stopPropagation();
+    api.close();
+  };
+
+  return (
+    <div
+      className="dockview-react-tab"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '0 0',
+        height: '100%',
+        width: '100%',
+      }}
+    >
+      {getIcon(params)}
+      <span className="truncate" style={{ flex: 1 }}>
+        {api.title}
+      </span>
+      <button
+        className="ml-2 hover:bg-red-500/20 rounded p-0.5"
+        onClick={onClose}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          border: 'none',
+          background: 'transparent',
+          cursor: 'pointer',
+          color: 'inherit',
+        }}
+        type="button"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </div>
+  );
+};
+
+const DockviewManager = forwardRef(
+  (
+    {
+      components = {},
+      onReady: onReadyCallback,
+      onPanelRemoved,
+      onLayoutChange,
+      initialLayout,
+    },
+    ref,
+  ) => {
+    const apiRef = useRef(null);
+
+    useImperativeHandle(ref, () => ({
+      addPanel: (id, componentName, params = {}) => {
+        if (!apiRef.current) return null;
+
+        const existingPanel = apiRef.current.getPanel(id);
+        if (existingPanel) {
+          existingPanel.api.setActive();
+          return existingPanel;
+        }
+
+        const panel = apiRef.current.addPanel({
+          id,
+          component: componentName,
+          params: {
+            ...params,
+            component: componentName,
+            iconType: componentName,
+          },
+          title: params.title || componentName,
+          tabComponent: 'customTab',
+        });
+
+        return panel;
+      },
+      removePanel: (id) => {
+        if (!apiRef.current) return;
+        const panel = apiRef.current.getPanel(id);
+        if (panel && apiRef.current.panels.length > 1) {
+          panel.api.close();
+        }
+      },
+      forceRemovePanel: (id) => {
+        if (!apiRef.current) return;
+        const panel = apiRef.current.getPanel(id);
+        if (panel) {
+          panel.api.close();
+        }
+      },
+      getPanel: (id) => {
+        return apiRef.current?.getPanel(id) || null;
+      },
+      updatePanelTitle: (id, newTitle) => {
+        if (!apiRef.current) return;
+        const panel = apiRef.current.getPanel(id);
+        if (panel) {
+          panel.api.setTitle(newTitle);
+        }
+      },
+      getAllPanels: () => {
+        return apiRef.current?.panels || [];
+      },
+      hasPanels: () => {
+        return (apiRef.current?.panels.length || 0) > 0;
+      },
+      getLayout: () => {
+        return apiRef.current?.toJSON() ?? null;
+      },
+      fromLayout: (layout) => {
+        if (!apiRef.current || !layout) return;
+        apiRef.current.fromJSON(layout);
+      },
+    }));
+
+    const handleReady = (event) => {
+      apiRef.current = event.api;
+
+      event.api.onDidRemovePanel(() => {
+        if (onPanelRemoved && apiRef.current) {
+          onPanelRemoved(apiRef.current.panels.length);
+        }
+      });
+
+      if (initialLayout) {
+        event.api.fromJSON(initialLayout);
+      }
+
+      if (onLayoutChange) {
+        event.api.onDidLayoutChange(() => onLayoutChange());
+      }
+
+      if (onReadyCallback) {
+        onReadyCallback(event.api);
+      }
+    };
+
+    return (
+      <DockviewReact
+        onReady={handleReady}
+        components={components}
+        className="dockview-theme-replit w-full h-full p-1!"
+        tabComponents={{
+          customTab: CustomTab,
+        }}
+      />
+    );
+  },
+);
+
+DockviewManager.displayName = 'DockviewManager';
+
+export default DockviewManager;
