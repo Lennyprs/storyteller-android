@@ -10,6 +10,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "build:web": "vite build --config vite.config.mjs",
+    "test:android-data": "node --test tests/android-*.test.mjs",
     "android:sync": "pnpm run build:web && cap sync android",
     "android:open": "cap open android",
     "android:build:debug": "pnpm run android:sync && cd android && gradlew.bat assembleDebug",
